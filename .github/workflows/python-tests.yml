@@ -1,0 +1,29 @@
+name: AS Coconut Traders Python checks
+on:
+  push:
+  pull_request:
+jobs:
+  syntax-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check Python syntax
+        run: |
+          python -m compileall -q .
+      - name: Install test dependencies
+        if: hashFiles('AS_Coconut_Traders_Billing.py') != ''
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb poppler-utils python3-tk
+          python -m pip install pillow reportlab
+      - name: Run sample transaction tests
+        if: hashFiles('RUN_AUTOMATED_TESTS.py') != ''
+        run: python RUN_AUTOMATED_TESTS.py
+      - name: Reject operational databases
+        run: |
+          if find . -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) | grep .; then
+            echo 'Do not commit operational databases'
+            exit 1
+          fi
