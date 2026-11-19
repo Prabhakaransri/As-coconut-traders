@@ -1,0 +1,22 @@
+# AS Coconut Traders - do not commit customer or operational data
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+backups/
+backup/
+Bills/
+bills/
+invoices/
+reports/
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+build/
+dist/
+*.exe
+*.log
