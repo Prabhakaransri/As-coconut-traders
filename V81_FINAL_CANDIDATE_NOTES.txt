@@ -1,0 +1,16 @@
+AS Coconut Traders V81 - final candidate (2026-11-20)
+
+Changes verified:
+- Fixed Complete Business Reset foreign-key constraint failure when clearing tables.
+- Full reset retains shop branding, recreates 14 coconut products + Packing Bag with zero stock.
+- Complete Reset requires backup, configured official WhatsApp Cloud API, owner PIN and final confirmation.
+- Reset wipes historical stock movement logs; Daily Stock Register starts at zero after reset.
+- Existing purchase edit/delete code updates linked current stock and supplier totals, subject to validation.
+
+Local verification: 14/14 existing automated tests pass, isolated complete-reset end-to-end test pass, Python syntax pass.
+
+Important limitations:
+- WhatsApp test uses a stub; real WhatsApp Business API delivery has NOT been tested.
+- Stock IN/OUT historical adjustment semantics for every edit/delete scenario are NOT comprehensively verified.
+- Windows EXE GitHub Actions build for V81 has NOT yet been run.
+- This is a TEST candidate; back up production data before use. Never upload customer database to GitHub.

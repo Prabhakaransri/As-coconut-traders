@@ -1,0 +1,11 @@
+AS Coconut Traders V81 - development build
+- Window version updated to V81.
+- Owner PIN setup (PBKDF2-HMAC-SHA256 with random salt).
+- Complete business reset with SQLite online backup, backup integrity check, owner PIN, typed confirmation, and transactional delete/reseed of all business tables except shop branding/settings.
+- Official WhatsApp Cloud API request and completion template alerts; reset is BLOCKED until configured.
+- PIN failed attempts lock for 15 minutes after 5 failures.
+- Existing purchase quantity edits/deletes already update current stock via delta and trigger stock movement log. Historical register IN/OUT can still show reversal movements; a full transaction-attributed rebuild is NOT implemented in this build.
+- WhatsApp Cloud API must be configured externally with environment variables ASCT_WA_PHONE_NUMBER_ID, ASCT_WA_ACCESS_TOKEN, ASCT_WA_RESET_TEMPLATE, ASCT_WA_COMPLETE_TEMPLATE, and optionally ASCT_OWNER_WHATSAPP (country code included).
+- API HTTP acceptance is not proof of WhatsApp delivery or owner approval. Owner PIN is required independently.
+- Reset is a high-risk operation: TEST ON A COPY ONLY until acceptance tests are completed.
+- Automated existing suite: 14 PASS / 0 FAIL (Linux virtual display). Full reset end-to-end and Windows GUI NOT yet validated.
