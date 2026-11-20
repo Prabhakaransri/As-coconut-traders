@@ -1,0 +1,9 @@
+AS Coconut Traders V80 - UI corrections based on screenshot review
+
+1. Old Bill Viewer displays product quantity with its unit (Kg, Nos, Litre) from the product master; Packing Bag defaults to Nos when the product reference is unavailable.
+2. Dashboard includes Packing Bag in available stock list (15 items total).
+3. Profit & Loss summary uses actual line breaks instead of displaying literal backslash-n characters.
+
+Source: user-provided V79 Windows 11 build kit.
+Data: This ZIP contains no billing.db and does not reset or replace the existing database.
+Verification: Python syntax compilation passed. Full Windows GUI / payment workflow testing was not possible in this environment. Take a database backup before upgrading.
