@@ -1,0 +1,30 @@
+name: V81 Windows Build and Tests
+on:
+  workflow_dispatch:
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pillow reportlab pyinstaller
+      - name: Validate V81 source files
+        shell: pwsh
+        run: |
+          @('V81_CHANGES.txt','V81_FINAL_CANDIDATE_NOTES.txt','AS_Coconut_Traders_Billing.py','RUN_AUTOMATED_TESTS.py','AS_Coconut_Traders.ico','AS_Coconut_Traders_Logo.png','AS_Coconut_Traders_Header_Logo.png','Coconut_Banner.png') | ForEach-Object {
+            if (-not (Test-Path $_)) { throw "Missing V81 required file: $_" }
+          }
+      - name: Compile Python
+        run: python -m compileall -q AS_Coconut_Traders_Billing.py RUN_AUTOMATED_TESTS.py
+      - name: Automated tests
+        run: python RUN_AUTOMATED_TESTS.py
+      - name: Package Windows application
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name AS_Coconut_Traders_Billing --icon AS_Coconut_Traders.ico --add-data "AS_Coconut_Traders_Logo.png;." --add-data "AS_Coconut_Traders_Header_Logo.png;." --add-data "Coconut_Banner.png;." --collect-all reportlab AS_Coconut_Traders_Billing.py
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AS-Coconut-Traders-V81-Windows
+          path: dist/AS_Coconut_Traders_Billing/
