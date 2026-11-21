@@ -246,6 +246,10 @@ header.pack(fill='x');header.pack_propagate(False)
 # V69: Scale the complete original banner to the available header width.
 # The 1920x150 source must never be drawn unscaled (it clips on laptop screens).
 _banner_path=BASE_DIR/'Coconut_Banner.png'
+if not _banner_path.is_file():
+    _banner_path=Path(sys.executable).resolve().parent/'Coconut_Banner.png'
+if not _banner_path.is_file():
+    _banner_path=BASE_DIR/'AS_Coconut_Traders_Logo.png'
 _banner_canvas=tk.Canvas(header,bg=DARK,height=118,highlightthickness=0)
 _banner_canvas.pack(fill='both',expand=True)
 _banner_source=None
@@ -2663,7 +2667,7 @@ def premium_bill_image(iid):
             try:return ImageFont.truetype(name,size)
             except OSError:pass
         return ImageFont.load_default()
-    fsm=ft(17);f=ft(19);fb=ft(20,True);fh=ft(27,True);ftitle=ft(32,True)
+    fsm=ft(14);f=ft(16);fb=ft(17,True);fh=ft(21,True);ftitle=ft(24,True)
     items=d['items'];extra_lines=sum(max(1,(len(str(it[0]))+32)//33) for it in items)
     H=1700+extra_lines*65+len(d['amounts'])*62
     im=Image.new('RGB',(W,H),'white');dr=ImageDraw.Draw(im)
@@ -2676,26 +2680,26 @@ def premium_bill_image(iid):
     logo=receipt_logo()
     if logo.is_file():
         try:
-            l=Image.open(logo).convert('RGBA');l.thumbnail((245,120))
+            l=Image.open(logo).convert('RGBA');l.thumbnail((210,95))
             im.paste(l,((W-l.width)//2,y),l);y+=l.height+12
         except Exception:pass
-    center('AS COCONUT TRADERS',y,ftitle,green);y+=45
-    center('COCONUT PURCHASE  •  SALES  •  WHOLESALE',y,fsm,green);y+=30
-    center(setting('phone') or '9361866945 / 7418989798',y,fb);y+=30
-    center(setting('website') or 'ascoconuttraders.in',y,fsm);y+=30
+    center('AS COCONUT TRADERS',y,ftitle,green);y+=34
+    center('COCONUT PURCHASE  •  SALES  •  WHOLESALE',y,fsm,green);y+=23
+    center(setting('phone') or '9361866945 / 7418989798',y,fb);y+=23
+    center(setting('website') or 'ascoconuttraders.in',y,fsm);y+=23
     addr=setting('address') or ''
     if addr:
-        for part in textwrap.wrap(addr,width=72)[:3]:center(part,y,fsm);y+=27
+        for part in textwrap.wrap(addr,width=72)[:3]:center(part,y,fsm);y+=22
     y+=10;rule(y);y+=20
-    dr.rounded_rectangle((255,y,645,y+48),radius=10,fill=green,outline=gold,width=3)
-    center('SALES BILL',y+6,fh,'white');y+=67
+    dr.rounded_rectangle((295,y,605,y+38),radius=8,fill=green,outline=gold,width=2)
+    center('SALES BILL',y+6,fh,'white');y+=49
     def detail(label,value):
         nonlocal y
         dr.text((pad+12,y),label,font=fb,fill=green)
         val=str(value)
         for j,line in enumerate(textwrap.wrap(val,width=58) or ['']):
             dr.text((225,y+j*27),line,font=f,fill=ink)
-        y+=max(33,27*len(textwrap.wrap(val,width=58)))
+        y+=max(27,23*len(textwrap.wrap(val,width=58)))
     detail('Bill No',d['number'])
     detail('Date',d['created'][:16].replace('T',' '))
     detail('Customer',d['name'])
@@ -2704,10 +2708,10 @@ def premium_bill_image(iid):
     y+=8
     # Compact receipt: keep item name and numeric values on separate lines.
     # This prevents collision even for long names and seven-digit amounts.
-    dr.rounded_rectangle((pad,y,W-pad,y+53),radius=9,fill=green)
+    dr.rounded_rectangle((pad,y,W-pad,y+39),radius=6,fill=green)
     dr.text((pad+15,y+10),'S.No',font=fb,fill='white')
     dr.text((pad+110,y+10),'Particulars',font=fb,fill='white')
-    y+=65
+    y+=49
     def right(t,x,yy,font,color=ink):
         b=dr.textbbox((0,0),str(t),font=font)
         dr.text((x-(b[2]-b[0]),yy),str(t),font=font,fill=color)
@@ -2729,7 +2733,7 @@ def premium_bill_image(iid):
         dr.text((pad+18,y),str(ix),font=f,fill=ink)
         for j,line in enumerate(parts):
             dr.text((pad+110,y+j*34),line,font=name_font,fill=ink)
-        y+=len(parts)*34+8
+        y+=len(parts)*27+6
         # Dedicated quantity/rate/amount row with non-overlapping columns.
         col_edges=(pad+260,pad+470,W-pad-10)
         col_lefts=(pad+112,pad+272,pad+490)
@@ -2743,7 +2747,7 @@ def premium_bill_image(iid):
                 value=value.replace(': ',':\n')
             for line_no,segment in enumerate(value.split('\n')):
                 right(segment,edge,y+line_no*25,vf)
-        y+=63
+        y+=46
         dr.line((pad,y-8,W-pad,y-8),fill='#D4DED3',width=2)
     y+=19
     for ix,(label,amount) in enumerate(d['amounts']):
@@ -2759,9 +2763,9 @@ def premium_bill_image(iid):
             label_font=ft(label_font.size-1,final)
         dr.text((pad+13,y+3),label_text,font=label_font,fill=color)
         right('Rs. '+f'{amount:,.2f}',W-pad-12,y+3,fb if final else f,color)
-        y+=62 if final else 52
-    y+=24;rule(y);y+=23
-    center('CUSTOMER ACCOUNT SUMMARY',y,fb,green);y+=47
+        y+=48 if final else 42
+    y+=15;rule(y);y+=15
+    center('CUSTOMER ACCOUNT SUMMARY',y,fb,green);y+=33
     last_label,last_amt=d['amounts'][-1]
     # Keep summary amounts in a dedicated right-aligned column.
     # The general invoice metadata detail() starts values at x=225 and
@@ -2786,7 +2790,7 @@ def premium_bill_image(iid):
         dr.rounded_rectangle((pad,y-7,W-pad,y+48),radius=7,fill=pale)
         dr.text((label_x,y+6),label,font=label_font,fill=green)
         right(amount_text,amount_right,y+6,amount_font,ink)
-        y+=68
+        y+=56
     if last_label=='AVAILABLE ADVANCE BALANCE':
         account_summary_row('Available Advance',last_amt)
         account_summary_row('Pending To Pay',0)
@@ -2794,8 +2798,8 @@ def premium_bill_image(iid):
         account_summary_row('Pending To Pay',last_amt)
         account_summary_row('Available Advance',0)
     y+=14;rule(y);y+=25
-    center('Thank you for your Business!',y,fh,green);y+=65
-    center('AS COCONUT TRADERS',y,fb,gold);y+=55
+    center('Thank you for your Business!',y,fh,green);y+=45
+    center('AS COCONUT TRADERS',y,fb,gold);y+=35
     # crop without leaving large empty receipt tail
     return im.crop((0,0,W,min(H,y+32)))
 
