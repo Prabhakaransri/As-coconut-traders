@@ -3521,11 +3521,20 @@ def v61_shutdown():
     root.destroy()
 root.protocol('WM_DELETE_WINDOW',v61_shutdown)
 
+# Check every minute so the 11:30 PM reminder is not delayed by up to an hour.
+# Show it once per day per running session; later edits are still checked on exit.
+_v81_last_closing_reminder_day=None
 def v61_reminder():
+    global _v81_last_closing_reminder_day
     now=datetime.now()
-    if (now.hour,now.minute)>=(23,30) and v64_report_state(now.strftime('%Y-%m-%d'))!='confirmed':
-        messagebox.showwarning('11:30 PM closing reminder','Daily closing WhatsApp report not confirmed sent. Open Reports & Backup to prepare it before shutting down.')
-    root.after(60*60*1000,v61_reminder)
+    day=now.strftime('%Y-%m-%d')
+    if (now.hour,now.minute)>=(23,30) and _v81_last_closing_reminder_day!=day:
+        if v64_report_state(day)!='confirmed':
+            _v81_last_closing_reminder_day=day
+            messagebox.showwarning('11:30 PM closing reminder',
+                'Today\'s owner WhatsApp closing report is not confirmed sent.\n'
+                'Open Reports & Backup to prepare and review the report before closing.')
+    root.after(60*1000,v61_reminder)
 root.after(60*1000,v61_reminder)
 
 # Global shortcut: Ctrl+S saves only while the New Bill page is active.
