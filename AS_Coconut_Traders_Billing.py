@@ -1631,6 +1631,14 @@ bag_cost_mode.set('Total purchase amount')
 ttk.Label(bag_form,text='Cost entered as').grid(row=2,column=0,sticky='w',padx=5,pady=5)
 bag_cost_mode.grid(row=2,column=1,sticky='ew',padx=5,pady=5)
 bag_purchase_paid=entry(bag_form,'Paid now',1,1)
+# Rev-1: link bag stock movements to the exact purchase/void transaction.
+# Do not infer reversals from equal quantities: independent trades can match.
+con.execute("""CREATE TABLE IF NOT EXISTS rev1_bag_stock_links(
+ purchase_id INTEGER PRIMARY KEY, movement_id INTEGER NOT NULL UNIQUE)""")
+con.execute("""CREATE TABLE IF NOT EXISTS rev1_voided_stock_movements(
+ movement_id INTEGER PRIMARY KEY, archive_id INTEGER NOT NULL)""")
+con.commit()
+
 def save_bag_purchase():
     try:
         name=bag_supplier.get().strip()
@@ -1648,9 +1656,13 @@ def save_bag_purchase():
                 con.execute("INSERT OR IGNORE INTO products(name,unit,stock,cost,rate,hsn,tax,active) VALUES('Packing Bag','Nos',0,0,0,'',0,1)")
             bag=con.execute("SELECT id FROM products WHERE name='Packing Bag'").fetchone()
         with con:
-            con.execute('INSERT INTO purchases(created,supplier,product_id,qty,unit_cost,amount,paid) VALUES(?,?,?,?,?,?,?)',
+            cur=con.execute('INSERT INTO purchases(created,supplier,product_id,qty,unit_cost,amount,paid) VALUES(?,?,?,?,?,?,?)',
                 (datetime.now().isoformat(timespec='seconds'),name,bag[0],qty,unit_cost,amount,paid))
+            purchase_id=cur.lastrowid
             con.execute('UPDATE products SET stock=stock+?,cost=? WHERE id=?',(qty,unit_cost,bag[0]))
+            movement=con.execute('SELECT MAX(id) FROM stock_movement_log WHERE product_id=?',(bag[0],)).fetchone()[0]
+            if movement is not None:
+                con.execute('INSERT INTO rev1_bag_stock_links(purchase_id,movement_id) VALUES(?,?)',(purchase_id,movement))
         for e in (bag_purchase_qty,bag_purchase_cost,bag_purchase_paid):e.delete(0,'end')
         refresh_all()
         messagebox.showinfo('Saved',f'{int(qty)} packing bags added to stock. Supplier balance updated.')
@@ -1751,9 +1763,14 @@ def delete_selected_bag_purchase():
             return
         v66_backup()  # Consistent snapshot before any stock/purchase deletion.
         with con:
-            con.execute('INSERT INTO bag_history_archive(kind,source_id,deleted_at,payload) VALUES(?,?,?,?)',('purchase',pid,datetime.now().isoformat(timespec='seconds'),json.dumps(record)))
+            archive_id=con.execute('INSERT INTO bag_history_archive(kind,source_id,deleted_at,payload) VALUES(?,?,?,?)',('purchase',pid,datetime.now().isoformat(timespec='seconds'),json.dumps(record))).lastrowid
+            original=con.execute('SELECT movement_id FROM rev1_bag_stock_links WHERE purchase_id=?',(pid,)).fetchone()
             con.execute('DELETE FROM purchases WHERE id=?',(pid,))
             con.execute('UPDATE products SET stock=stock-? WHERE id=?',(qty,bid))
+            reversal=con.execute('SELECT MAX(id) FROM stock_movement_log WHERE product_id=?',(bid,)).fetchone()[0]
+            if original and reversal is not None:
+                con.executemany('INSERT OR IGNORE INTO rev1_voided_stock_movements(movement_id,archive_id) VALUES(?,?)',[(original[0],archive_id),(reversal,archive_id)])
+            con.execute('DELETE FROM rev1_bag_stock_links WHERE purchase_id=?',(pid,))
         refresh_all()
         messagebox.showinfo('Archived','Purchase deleted and archived. Use Restore Last Deleted Bag Entry to undo.')
     except (ValueError,sqlite3.Error) as ex:messagebox.showerror('Delete purchase',str(ex))
@@ -1918,6 +1935,7 @@ def stock_register_rows(day):
             # For later days, opening is post-reset accumulated movements.
             inout=con.execute('''SELECT COALESCE(SUM(qty_in),0),COALESCE(SUM(qty_out),0)
                 FROM stock_movement_log WHERE product_id=?
+                AND id NOT IN (SELECT movement_id FROM rev1_voided_stock_movements)
                 AND REPLACE(changed,' ','T')>?
                 AND substr(changed,1,10)=?''',(pid,cutoff,day)).fetchone()
         else:
@@ -1926,7 +1944,9 @@ def stock_register_rows(day):
                 (pid,day)).fetchone()[0]
             opening=float(initial)+float(prior)
             inout=con.execute('''SELECT COALESCE(SUM(qty_in),0),COALESCE(SUM(qty_out),0)
-                FROM stock_movement_log WHERE product_id=? AND substr(changed,1,10)=?''',
+                FROM stock_movement_log WHERE product_id=?
+                AND id NOT IN (SELECT movement_id FROM rev1_voided_stock_movements)
+                AND substr(changed,1,10)=?''',
                 (pid,day)).fetchone()
         stock_in,stock_out=map(float,inout)
         opening=float(opening)
