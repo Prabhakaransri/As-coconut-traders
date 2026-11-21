@@ -3370,8 +3370,8 @@ def v63_report(day):
     initial=con.execute('SELECT COALESCE(SUM(paid),0) FROM invoices WHERE substr(created,1,10)=?',(day,)).fetchone()[0]
     receipts=con.execute('SELECT COALESCE(SUM(amount),0) FROM payments WHERE substr(created,1,10)=?',(day,)).fetchone()[0]
     account=con.execute('SELECT COALESCE(SUM(amount),0) FROM customer_payments WHERE substr(created,1,10)=?',(day,)).fetchone()[0]
-    sections=[['AS COCONUT TRADERS | '+day,'DAILY CLOSING (OWNER ONLY)']]
-    cust=['CUSTOMER SALES / PAYMENTS']
+    sections=[['🌴 AS COCONUT TRADERS | '+day,'DAILY BUSINESS CLOSING REPORT (OWNER ONLY)','Report date: '+day,'Prepared at: '+datetime.now().strftime('%I:%M %p')]]
+    cust=['1. CUSTOMER-WISE SALES / PAYMENTS']
     for cid,name in con.execute('SELECT id,name FROM customers ORDER BY name').fetchall():
         items=con.execute('''SELECT ii.description,SUM(ii.qty),SUM(ii.line_total),p.unit FROM invoice_items ii
           JOIN invoices i ON i.id=ii.invoice_id LEFT JOIN products p ON p.id=ii.product_id
@@ -3386,7 +3386,7 @@ def v63_report(day):
         cust.append('  Bill '+v63_amount(todays_bills[0])+' | Collected '+v63_amount(todays_bills[1]+extra))
     if len(cust)==1:cust.append('No customer activity')
     sections.append(cust)
-    received=['TODAY PURCHASES']
+    received=['2. PURCHASES / SUPPLIERS']
     for supplier,name,unit,qty,amount in con.execute('''SELECT p.supplier,pr.name,pr.unit,SUM(p.qty),SUM(p.amount)
        FROM purchases p JOIN products pr ON pr.id=p.product_id WHERE substr(p.created,1,10)=?
        GROUP BY p.supplier,pr.name,pr.unit ORDER BY pr.name,p.supplier''',(day,)).fetchall():
@@ -3395,7 +3395,7 @@ def v63_report(day):
     sections.append(received)
     # V65: Human-readable stock movement summary. No database writes.
     # "Added" is the register's movement total, not necessarily purchases.
-    stock=['STOCK BALANCE (Kg / Nos shown separately)']
+    stock=['3. PRODUCT-WISE STOCK (Kg / Nos shown separately)']
     alerts=[]
     register=stock_register_rows(day)
     for name,unit,opening,stock_in,stock_out,closing in register:
@@ -3415,7 +3415,7 @@ def v63_report(day):
     if len(stock)==1:stock.append('No stock movement or balance recorded')
     stock.append('Added = purchases + manual stock entries/adjustments (where applicable)')
     sections.append(stock)
-    balances=['CUSTOMER PENDING / ADVANCE']
+    balances=['4. CUSTOMER PENDING / ADVANCE']
     total_due=total_adv=0
     for cid,name in con.execute('SELECT id,name FROM customers ORDER BY name').fetchall():
         due,adv=customer_account_position(cid)
@@ -3424,15 +3424,19 @@ def v63_report(day):
         if adv>0.005:balances.append(str(name)+' advance '+v63_amount(adv))
     if len(balances)==1:balances.append('No pending / advance')
     sections.append(balances)
-    sections.append(['SUMMARY','Bills '+str(bills)+' | Sales '+v63_amount(sales),
-        'Purchase '+v63_amount(purchase)+' | Collection '+v63_amount(initial+receipts+account),
-        'Expenses '+v63_amount(expenses),
-        'Pending '+v63_amount(total_due)+' | Advance '+v63_amount(total_adv)])
+    sections.append(['5. DAILY BUSINESS SUMMARY','Bills '+str(bills)+' | Sales '+v63_amount(sales),
+        'Collected at billing '+v63_amount(initial),
+        'Other bill receipts '+v63_amount(receipts)+' | Customer receipts '+v63_amount(account),
+        'Total recorded collection '+v63_amount(initial+receipts+account),
+        'Credit billed today '+v63_amount(max(0,float(sales)-float(initial))),
+        'Purchase '+v63_amount(purchase)+' | Expenses '+v63_amount(expenses),
+        'Total customer pending '+v63_amount(total_due)+' | Advance '+v63_amount(total_adv),
+        'Cash opening/closing not calculated: no verified cashbook reconciliation'])
     try:
         check=con.execute('PRAGMA quick_check').fetchone()[0]
         if check!='ok':alerts.append('Database integrity: '+str(check))
     except Exception as exc:alerts.append('Database check failed: '+str(exc))
-    sections.append(['CHECKS: '+('; '.join(alerts) if alerts else 'No basic errors found')])
+    sections.append(['6. BUSINESS ALERTS: '+('; '.join(alerts) if alerts else 'No basic errors found')])
     # Never invent daily profit: no verified historical COGS ledger.
     return sections,alerts
 
