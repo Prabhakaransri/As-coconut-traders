@@ -3524,18 +3524,13 @@ def save_shortcut(event):
     if nb.tab(nb.select(),'text')=='New Bill':create_invoice()
 root.bind('<Control-s>',save_shortcut)
 
-# V81: Owner-authorized complete business reset. Disabled unless an official
-# WhatsApp Business Cloud API integration is configured. No unofficial auto-send.
+# V81 Rev-1: Owner PIN + verified pre-reset backup + explicit confirmation.
+# WhatsApp Cloud API is not required for local business reset.
 V81_SECURITY_DIR=DATA/'Owner_Security'
 V81_SECURITY_DIR.mkdir(parents=True,exist_ok=True)
 V81_PIN_FILE=V81_SECURITY_DIR/'owner_pin.json'
 V81_RESET_BACKUPS=DATA/'Pre_Reset_Backups'
 V81_RESET_BACKUPS.mkdir(parents=True,exist_ok=True)
-V81_PHONE=os.environ.get('ASCT_OWNER_WHATSAPP','9361866945').lstrip('+')
-V81_WA_PHONE_ID=os.environ.get('ASCT_WA_PHONE_NUMBER_ID','').strip()
-V81_WA_TOKEN=os.environ.get('ASCT_WA_ACCESS_TOKEN','').strip()
-V81_WA_TEMPLATE=os.environ.get('ASCT_WA_RESET_TEMPLATE','').strip()
-V81_WA_COMPLETE_TEMPLATE=os.environ.get('ASCT_WA_COMPLETE_TEMPLATE','').strip()
 
 def v81_pin_hash(pin,salt):
     return hashlib.pbkdf2_hmac('sha256',pin.encode('utf-8'),bytes.fromhex(salt),300000).hex()
@@ -3561,41 +3556,21 @@ def v81_verify_pin(pin):
         return secrets.compare_digest(v81_pin_hash(pin,stored['salt']),stored['hash'])
     except (OSError,ValueError,KeyError):return False
 
-def v81_send_reset_alert(stage):
-    # WhatsApp Cloud API template must be pre-approved and have no parameters.
-    # HTTP acceptance is not proof of WhatsApp delivery or owner approval.
-    if not all((V81_WA_PHONE_ID,V81_WA_TOKEN,V81_WA_TEMPLATE,V81_WA_COMPLETE_TEMPLATE)):
-        raise RuntimeError('Official WhatsApp Cloud API is not configured. Reset is disabled.')
-    payload={'messaging_product':'whatsapp','to':V81_PHONE,'type':'template',
-             'template':{'name':V81_WA_TEMPLATE if stage=='request' else V81_WA_COMPLETE_TEMPLATE,'language':{'code':'en_US'}}}
-    url='https://graph.facebook.com/v22.0/'+V81_WA_PHONE_ID+'/messages'
-    req=urllib.request.Request(url,data=json.dumps(payload).encode(),
-        headers={'Authorization':'Bearer '+V81_WA_TOKEN,'Content-Type':'application/json'},method='POST')
-    with urllib.request.urlopen(req,timeout=15) as response:
-        body=json.load(response)
-    if not body.get('messages'):
-        raise RuntimeError('WhatsApp API did not accept the '+stage+' alert.')
-    return body['messages'][0].get('id','')
-
 def v81_reset_business_data():
     if not V81_PIN_FILE.exists():
         return messagebox.showerror('Owner PIN required','Set the owner PIN first.')
-    if not all((V81_WA_PHONE_ID,V81_WA_TOKEN,V81_WA_TEMPLATE,V81_WA_COMPLETE_TEMPLATE)):
-        return messagebox.showerror('WhatsApp not configured',
-            'Reset is locked until the official WhatsApp Business Cloud API is configured.\n'
-            'Set ASCT_WA_PHONE_NUMBER_ID, ASCT_WA_ACCESS_TOKEN and ASCT_WA_RESET_TEMPLATE and ASCT_WA_COMPLETE_TEMPLATE.')
     if not messagebox.askyesno('DANGER: Complete Business Reset',
         'This permanently clears all customers, suppliers, invoices, purchases, payments, stock history and recycle bin.\n'
         'A separate backup will be saved. Continue?',parent=root):return
-    pin=simpledialog.askstring('Owner Authorization','Enter your owner PIN:',show='*',parent=root)
-    if pin is None:return
-    # Persist lockout state across attempts, preventing brute-force by reopening UI.
+    # Enforce lockout before prompting for a PIN, including after app restart.
     lockfile=V81_SECURITY_DIR/'pin_attempts.json'
     try:state=json.loads(lockfile.read_text())
     except (OSError,ValueError):state={'count':0,'until':0}
     import time
     if time.time()<state.get('until',0):
         return messagebox.showerror('Locked','Too many incorrect PINs. Try again after 15 minutes.')
+    pin=simpledialog.askstring('Owner Authorization','Enter your owner PIN:',show='*',parent=root)
+    if pin is None:return
     if not v81_verify_pin(pin):
         state['count']=state.get('count',0)+1
         if state['count']>=5:state={'count':0,'until':time.time()+900}
@@ -3612,7 +3587,6 @@ def v81_reset_business_data():
         with sqlite3.connect(backup) as check:
             if check.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
                 raise RuntimeError('Pre-reset backup integrity check failed')
-        v81_send_reset_alert('request')
         # Temporarily disable FK enforcement for the all-table wipe. SQLite cannot
         # reliably clear cyclic/parent-child tables in arbitrary schema order.
         # Validate all foreign keys before committing, and always restore enforcement.
@@ -3633,22 +3607,16 @@ def v81_reset_business_data():
                 raise RuntimeError('Foreign key check failed; reset rolled back.')
         finally:
           con.execute('PRAGMA foreign_keys=ON')
-        # Post-reset alert is best effort; failure must be clearly reported.
-        try:
-            v81_send_reset_alert('completed')
-            messagebox.showinfo('Reset completed','Fresh business data created.\nBackup: '+str(backup))
-        except Exception as ex:
-            messagebox.showwarning('Reset completed - alert issue',
-                'Reset succeeded, but completion WhatsApp alert was not accepted.\n'+str(ex)+'\nBackup: '+str(backup))
+        messagebox.showinfo('Reset completed','Fresh business data created.\\nVerified backup: '+str(backup))
         refresh_all()
     except Exception as ex:
         messagebox.showerror('Reset stopped','Reset did not complete.\n'+str(ex)+'\nBackup: '+str(backup))
 
 v81_security=ttk.LabelFrame(tabs['Shop Settings'],text='V81 Owner Security & Complete Business Reset',padding=12)
 v81_security.pack(fill='x',padx=15,pady=10)
-ttk.Label(v81_security,text='DANGER: Reset clears all business records; shop branding is retained. WhatsApp Business API required.').pack(anchor='w')
+ttk.Label(v81_security,text='DANGER: Reset clears business records; shop branding is retained. Verified backup, owner PIN and typed confirmation required.').pack(anchor='w')
 ttk.Button(v81_security,text='SET UP OWNER PIN',command=v81_setup_pin).pack(side='left',padx=5,pady=8)
-ttk.Button(v81_security,text='COMPLETE BUSINESS RESET (BACKUP + ALERT + PIN)',command=v81_reset_business_data).pack(side='left',padx=5,pady=8)
+ttk.Button(v81_security,text='COMPLETE BUSINESS RESET (BACKUP + PIN)',command=v81_reset_business_data).pack(side='left',padx=5,pady=8)
 
 purge_expired_recycle()
 refresh_recycle()
