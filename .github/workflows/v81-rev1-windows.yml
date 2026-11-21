@@ -20,8 +20,14 @@ jobs:
         run: python -m py_compile AS_Coconut_Traders_Billing.py
       - name: Run isolated stock regression tests
         run: python -m unittest discover -s tests -p "test_rev1_*.py" -v
-      - name: Build Windows application
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name AS_Coconut_Traders_Billing AS_Coconut_Traders_Billing.py
+      - name: Verify original AS Coconut Traders branding assets
+        shell: pwsh
+        run: |
+          foreach ($file in @("AS_Coconut_Traders_Logo.png", "Coconut_Banner.png")) {
+            if (-not (Test-Path $file)) { throw "Missing original branding asset: $file. Upload the original PNG to the repository root." }
+          }
+      - name: Build Windows application with original logo and banner
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name AS_Coconut_Traders_Billing --add-data "AS_Coconut_Traders_Logo.png;." --add-data "Coconut_Banner.png;." AS_Coconut_Traders_Billing.py
       - name: Upload Windows EXE bundle
         uses: actions/upload-artifact@v4
         with:
