@@ -2494,8 +2494,13 @@ def receipt_lines(iid):
     return lines
 
 def receipt_logo():
-    logo=Path(setting('logo_path')) if setting('logo_path') else BASE_DIR/'AS_Coconut_Traders_Logo.png'
-    return logo if logo.is_file() else BASE_DIR/'AS_Coconut_Traders_Logo.png'
+    configured=setting('logo_path')
+    candidates=[Path(configured)] if configured else []
+    candidates.extend([BASE_DIR/'AS_Coconut_Traders_Logo.png',Path(sys.executable).resolve().parent/'AS_Coconut_Traders_Logo.png'])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return BASE_DIR/'AS_Coconut_Traders_Logo.png'
 
 def receipt_pdf_render(iid, output, monochrome=False):
     """True vector text and rules; colour archive / monochrome thermal print."""
@@ -2658,7 +2663,7 @@ def premium_bill_image(iid):
             try:return ImageFont.truetype(name,size)
             except OSError:pass
         return ImageFont.load_default()
-    fsm=ft(22);f=ft(25);fb=ft(26,True);fh=ft(40,True);ftitle=ft(47,True)
+    fsm=ft(17);f=ft(19);fb=ft(20,True);fh=ft(27,True);ftitle=ft(32,True)
     items=d['items'];extra_lines=sum(max(1,(len(str(it[0]))+32)//33) for it in items)
     H=1700+extra_lines*65+len(d['amounts'])*62
     im=Image.new('RGB',(W,H),'white');dr=ImageDraw.Draw(im)
@@ -2671,26 +2676,26 @@ def premium_bill_image(iid):
     logo=receipt_logo()
     if logo.is_file():
         try:
-            l=Image.open(logo).convert('RGBA');l.thumbnail((370,165))
+            l=Image.open(logo).convert('RGBA');l.thumbnail((245,120))
             im.paste(l,((W-l.width)//2,y),l);y+=l.height+12
         except Exception:pass
-    center('AS COCONUT TRADERS',y,ftitle,green);y+=62
-    center('COCONUT PURCHASE  •  SALES  •  WHOLESALE',y,fsm,green);y+=45
-    center(setting('phone') or '9361866945 / 7418989798',y,fb);y+=39
-    center(setting('website') or 'ascoconuttraders.in',y,fsm);y+=39
+    center('AS COCONUT TRADERS',y,ftitle,green);y+=45
+    center('COCONUT PURCHASE  •  SALES  •  WHOLESALE',y,fsm,green);y+=30
+    center(setting('phone') or '9361866945 / 7418989798',y,fb);y+=30
+    center(setting('website') or 'ascoconuttraders.in',y,fsm);y+=30
     addr=setting('address') or ''
     if addr:
-        for part in textwrap.wrap(addr,width=57)[:3]:center(part,y,fsm);y+=32
+        for part in textwrap.wrap(addr,width=72)[:3]:center(part,y,fsm);y+=27
     y+=10;rule(y);y+=20
-    dr.rounded_rectangle((255,y,645,y+62),radius=13,fill=green,outline=gold,width=4)
-    center('SALES BILL',y+7,fh,'white');y+=85
+    dr.rounded_rectangle((255,y,645,y+48),radius=10,fill=green,outline=gold,width=3)
+    center('SALES BILL',y+6,fh,'white');y+=67
     def detail(label,value):
         nonlocal y
         dr.text((pad+12,y),label,font=fb,fill=green)
         val=str(value)
-        for j,line in enumerate(textwrap.wrap(val,width=47) or ['']):
-            dr.text((225,y+j*34),line,font=f,fill=ink)
-        y+=max(43,34*len(textwrap.wrap(val,width=47)))
+        for j,line in enumerate(textwrap.wrap(val,width=58) or ['']):
+            dr.text((225,y+j*27),line,font=f,fill=ink)
+        y+=max(33,27*len(textwrap.wrap(val,width=58)))
     detail('Bill No',d['number'])
     detail('Date',d['created'][:16].replace('T',' '))
     detail('Customer',d['name'])
