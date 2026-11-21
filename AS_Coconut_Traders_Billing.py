@@ -1888,30 +1888,6 @@ stock_day_table.pack(fill='both',expand=True,padx=12,pady=8)
 stock_day_note=ttk.Label(stock_day_tab,text='',foreground=GREEN)
 stock_day_note.pack(anchor='w',padx=12,pady=4)
 
-# Rev-1: paired same-day stock corrections are hidden from operational IN/OUT
-# without deleting the immutable stock movement audit trail.
-def rev1_register_inout(product_id,day,cutoff=None):
-    q="""SELECT m.id,m.qty_in,m.qty_out FROM stock_movement_log m
-         WHERE m.product_id=? AND substr(m.changed,1,10)=?"""
-    args=[product_id,day]
-    if cutoff is not None:
-        q+=" AND REPLACE(m.changed,' ','T')>?"
-        args.append(cutoff)
-    records=con.execute(q,args).fetchall()
-    # Only cancel exact opposite movements on the same date. Preserve all
-    # other movements and the full underlying ledger for audit/history.
-    remaining=list(records)
-    canceled=set()
-    for i,(mid,stock_in,stock_out) in enumerate(remaining):
-        if mid in canceled:continue
-        for other_id,other_in,other_out in remaining[i+1:]:
-            if other_id in canceled:continue
-            if (stock_in>0 and stock_out==0 and abs(stock_in-other_out)<1e-7 and other_in==0) or (stock_out>0 and stock_in==0 and abs(stock_out-other_in)<1e-7 and other_out==0):
-                canceled.update((mid,other_id))
-                break
-    return (sum(float(inc) for mid,inc,out in remaining if mid not in canceled),
-            sum(float(out) for mid,inc,out in remaining if mid not in canceled))
-
 def stock_register_rows(day):
     # V58: A completed RESET ALL STOCK & PRICE starts a new stock ledger epoch.
     # Keep historical stock movements intact for auditing and historical date views.
@@ -1940,13 +1916,18 @@ def stock_register_rows(day):
                 AND substr(changed,1,10)<?''',(pid,cutoff,day)).fetchone()[0]
             # On the reset date show zero opening and only post-reset movements.
             # For later days, opening is post-reset accumulated movements.
-            inout=rev1_register_inout(pid,day,cutoff)
+            inout=con.execute('''SELECT COALESCE(SUM(qty_in),0),COALESCE(SUM(qty_out),0)
+                FROM stock_movement_log WHERE product_id=?
+                AND REPLACE(changed,' ','T')>?
+                AND substr(changed,1,10)=?''',(pid,cutoff,day)).fetchone()
         else:
             prior=con.execute('''SELECT COALESCE(SUM(qty_in-qty_out),0)
                 FROM stock_movement_log WHERE product_id=? AND substr(changed,1,10)<?''',
                 (pid,day)).fetchone()[0]
             opening=float(initial)+float(prior)
-            inout=rev1_register_inout(pid,day)
+            inout=con.execute('''SELECT COALESCE(SUM(qty_in),0),COALESCE(SUM(qty_out),0)
+                FROM stock_movement_log WHERE product_id=? AND substr(changed,1,10)=?''',
+                (pid,day)).fetchone()
         stock_in,stock_out=map(float,inout)
         opening=float(opening)
         result.append((name,unit,round(opening,3),round(stock_in,3),
