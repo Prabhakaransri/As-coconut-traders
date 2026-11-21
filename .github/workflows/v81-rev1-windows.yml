@@ -1,0 +1,31 @@
+name: V81 Rev-1 Windows build and stock tests
+on:
+  push:
+    branches: [v81-rev1-stock-fix]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install application and build dependencies
+        run: python -m pip install --upgrade pyinstaller pillow reportlab
+      - name: Check application syntax
+        run: python -m py_compile AS_Coconut_Traders_Billing.py
+      - name: Run isolated stock regression tests
+        run: python -m unittest discover -s tests -p "test_rev1_*.py" -v
+      - name: Build Windows application
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name AS_Coconut_Traders_Billing AS_Coconut_Traders_Billing.py
+      - name: Upload Windows EXE bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: AS-Coconut-Traders-V81-Rev1-Windows-Candidate
+          path: dist/AS_Coconut_Traders_Billing/
+          if-no-files-found: error
+          retention-days: 14
