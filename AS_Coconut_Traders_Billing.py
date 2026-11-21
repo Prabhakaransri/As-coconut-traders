@@ -2498,12 +2498,24 @@ def receipt_lines(iid):
     return lines
 
 def receipt_logo():
+    """Resolve the owner's ORIGINAL artwork; never substitute a generated logo."""
     configured=setting('logo_path')
-    candidates=[Path(configured)] if configured else []
-    candidates.extend([BASE_DIR/'AS_Coconut_Traders_Logo.png',Path(sys.executable).resolve().parent/'AS_Coconut_Traders_Logo.png'])
+    names=('AS_Coconut_Traders_Logo.png',
+           'AS_Coconut_Traders_Header_Logo.png',
+           'Coconut Traders Gold Badge Logo.png',
+           'AS Coconut Traders Logo(1).png',
+           'AS Coconut Traders Logo.png')
+    roots=(DATA, BASE_DIR, Path(sys.executable).resolve().parent)
+    candidates=([Path(configured).expanduser()] if configured else [])
+    candidates.extend(root/name for root in roots for name in names)
     for candidate in candidates:
         if candidate.is_file():
-            return candidate
+            try:
+                from PIL import Image
+                with Image.open(candidate) as img: img.verify()
+                return candidate
+            except (OSError,ValueError):
+                continue
     return BASE_DIR/'AS_Coconut_Traders_Logo.png'
 
 def receipt_pdf_render(iid, output, monochrome=False):
