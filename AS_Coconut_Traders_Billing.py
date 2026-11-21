@@ -1805,6 +1805,10 @@ def restore_last_bag_entry():
                 else:
                     con.execute('INSERT INTO purchases(id,created,supplier,product_id,qty,unit_cost,amount,paid,group_id) VALUES(?,?,?,?,?,?,?,?,?)',(*purchase_data,original_group_id))
                 con.execute('UPDATE products SET stock=stock+? WHERE id=?',(data[4],data[3]))
+                restored_purchase_id=con.execute('SELECT MAX(id) FROM purchases WHERE product_id=?',(data[3],)).fetchone()[0] if id_collision else source_id
+                restored_movement=con.execute('SELECT MAX(id) FROM stock_movement_log WHERE product_id=?',(data[3],)).fetchone()[0]
+                if restored_movement is not None:
+                    con.execute('INSERT OR REPLACE INTO rev1_bag_stock_links(purchase_id,movement_id) VALUES(?,?)',(restored_purchase_id,restored_movement))
             else:
                 if id_collision:
                     con.execute('INSERT INTO supplier_payments(supplier,created,amount,method,reference) VALUES(?,?,?,?,?)',data[1:])
